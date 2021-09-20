@@ -118,11 +118,9 @@ exports.renderView = function(options, cb) {
                 page.setDefaultNavigationTimeout(updatedTimeout);
 
                 await page.goto(host + '/login/token/' + token + '?ssr=true');
-
                 await page.waitForSelector('countly', {timeout: updatedTimeout});
-
                 await timeout(1500);
-
+                await page.setCacheEnabled(false); //to do not cache
                 await page.goto(host + view);
 
                 if (waitForRegex) {
@@ -171,21 +169,27 @@ exports.renderView = function(options, cb) {
                     type: 'png',
                     encoding: 'binary'
                 };
-
                 if (id) {
                     var rect = await page.evaluate(function(selector) {
-                    /*global document */
+
+                        var dimensions2 = {};
+                        /*global document */
                         var element = document.querySelector(selector);
-                        dimensions = element.getBoundingClientRect();
+                        if (element) {
+                            dimensions2 = element.getBoundingClientRect();
+                        }
+                        else {
+                            element = {};
+                        }
                         return {
-                            left: dimensions.x,
-                            top: dimensions.y,
-                            width: dimensions.width,
-                            height: dimensions.height,
+                            left: dimensions2.x,
+                            top: dimensions2.y,
+                            width: dimensions2.width,
+                            height: dimensions2.height,
                             id: element.id
+
                         };
                     }, id);
-
                     var clip = {
                         x: rect.left,
                         y: rect.top,
@@ -202,7 +206,7 @@ exports.renderView = function(options, cb) {
 
                 await page.evaluate(function() {
                     var $ = window.$;
-                    $("#user-logout").trigger("click");
+                    //$("#user-logout").trigger("click");
                 });
 
                 await timeout(1500);

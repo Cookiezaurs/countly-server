@@ -1549,9 +1549,24 @@ Promise.all([plugins.dbConnection(countlyConfig), plugins.dbConnection("countly_
         var view = req.query.view || "";
         var route = req.query.route || "";
         var id = req.query.id || "";
+        if (req.query.options) {
+            try {
+                req.query.options = JSON.parse(req.query.options);
+            }
+            catch (e) {
+                req.query.options = {};
+            }
+        }
+        else {
+            req.query.options = {};
+        }
 
         options.view = view + "#" + route;
         options.id = id ? "#" + id : "";
+
+        if (req.query.options.dimensions) {
+            options.dimensions = req.query.options.dimensions;
+        }
 
         var randomString = (+new Date()).toString() + (Math.random()).toString();
         var imageName = "screenshot_" + sha1Hash(randomString) + ".png";
@@ -1575,8 +1590,14 @@ Promise.all([plugins.dbConnection(countlyConfig), plugins.dbConnection("countly_
                     if (err3) {
                         return res.send(false);
                     }
+                    //delete token
+                    countlyDb.collection("auth_tokens").remove({"_id": options.token}, function(err4) {
+                        if (err4) {
+                            console.log(err4);
+                        }
+                        return res.send({path: countlyConfig.path + "/images/screenshots/" + imageName});
+                    });
 
-                    return res.send({path: countlyConfig.path + "/images/screenshots/" + imageName});
                 });
             }
         });
