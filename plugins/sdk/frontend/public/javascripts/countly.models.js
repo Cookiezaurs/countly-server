@@ -21,7 +21,8 @@
         if (!metric) {
             metric = "u";
         }
-        var data = countlySDK.getData(true, false, "sdk_version").chartData;
+		var isPercentage = true;
+        var data = countlySDK.getData(true, false, "sdk_version").chartData
         var chartData = [];
         var dataProps = [];
         for (let i = 0; i < data.length; i++) {
@@ -30,11 +31,57 @@
                 dataProps.push({ name: data[i].sdk_version });
             }
         }
-
-        var series = countlyCommon.extractChartData(countlySDK.getDb(), countlySDK.clearObject, chartData, dataProps, "", true).chartDP;
+		var dd = countlyCommon.extractChartData(countlySDK.getDb(), countlySDK.clearObject, chartData, dataProps, "", true);
+        var series = dd.chartDP;
+		var totals = [];
+		var percent = [];
+		var labels = [];
+		
+		for(var z=0; z<dd.chartData.length; z++){
+			labels.push(dd.chartData[z].date);
+		}
+		
         var legend = {"type": "primary", data: []};
+		//lets sort series
+		series = series.sort(function(a,b){
+			var v1 = a.label;
+			var v2 = b.label
+			v1 = v1.split(".");
+			v2 = v2.split(".");
+			var longest = Math.max(v1.length, v2.length);
+			
+			for(var z=0; z<longest; z++){
+				var i1 = 0;
+				var i2 = 0;
+				if(v1[z]){
+					i1 = parseInt(v1[z]);
+				}
+				if(v2[z]){
+					i2 = parseInt(v2[z]);
+				}
+				if(i1 !== i2){
+					if(i2>i1){
+						return 1;
+					}
+					else {
+					return -1
+					}
+				}
+			}
+			return 1;
+		});
+		for (let i = 0; i < series.length; i++) {
+			for (let j = 0; j < series[i].data.length; j++) {
+				totals[j] = totals[j] || 0;
+				if (series[i].data[j][1]) {
+					totals[j]+=series[i].data[j][1][metric] || 0;
+					percent[j] = 100;
+				}
+			}
+		}
         for (let i = 0; i < series.length; i++) {
             series[i].name = series[i].label;
+			series[i].stack = "default";
             legend.data[i] = {
                 "name": series[i].label,
                 "value": 0,
@@ -43,17 +90,42 @@
                 "percentage": 0
             };
             for (let j = 0; j < series[i].data.length; j++) {
+				
                 if (series[i].data[j][1]) {
-                    series[i].data[j] = series[i].data[j][1][metric] || 0;
+					legend.data[i].value += series[i].data[j][1][metric];
+					if(isPercentage){
+						var  value  = Math.round(series[i].data[j][1][metric]*100/totals[j]);
+						if((percent[j] - value)>0){
+							series[i].data[j] = Math.round(series[i].data[j][1][metric]*100/totals[j]);
+							percent[j]  = percent[j] - value
+						}
+						else {
+							series[i].data[j] = percent[j];
+							percent[j] = 0;
+						}
+					}
+					else {
+						series[i].data[j] = series[i].data[j][1][metric]
+					}
                 }
                 else {
                     series[i].data[j] = 0;
                 }
-                legend.data[i].value += series[i].data[j];
             }
         }
-        return {series: series, legend: legend};
-    };
+		
+		var xAxis =  {
+            type: 'category',
+            data:  labels
+        }
+		
+		var yAxis = {};
+		if(isPercentage){
+			yAxis.axisLabel = {formatter: '{value} %'};
+		}
+        return {xAxis:xAxis,legend:legend, yAxis:yAxis,series: series};
+					
+    }
 
     countlySDK.service = {
         initialize: function() {
@@ -238,7 +310,7 @@
                     state.isLoading = false;
                 },
                 setSDKChartData: function(state, value) {
-                    state.chartData = {series: value.series};
+                    state.chartData = {series: value.series, xAxis: value.xAxis, yAxis:value.yAxis};
                     state.legendData = value.legend;
                 },
                 setSelectedProperty: function(state, value) {
